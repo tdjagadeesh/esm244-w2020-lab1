@@ -1,0 +1,84 @@
+---
+title: "Lab 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+#means that the default is that ALL the code shows up when you knit
+
+library(tidyverse)
+library(here) #Good package for finding files easily
+library(janitor)
+library(kableExtra)
+```
+
+Read in noaa_fisheries.csv data
+```{r}
+#Could do: us_landings <- read_csv("data/noaa_fisheries.csv")
+#But.. only works if you're looking downstream + might not work for all operating systems 
+#So instead use 'here' package
+
+landings <- read_csv(here("data","noaa_fisheries.csv"))
+
+```
+
+Make a tidy version of the dataframe
+```{r}
+landings_tidy <- landings %>% 
+  janitor::clean_names() %>% #Convert column names into lowercase snake 
+  mutate(state = str_to_lower(state), 
+         afs_name = str_to_lower(afs_name)) %>% #Convert characters in columns to lowercase - use 'state' to override the origional 'state' column)
+  mutate(dollars_usd = parse_number(dollars_usd))
+class(landings_tidy$dollars_usd) #Character - need to make a factor
+
+```
+
+Salmon data wrangling
+```{r}
+salmon_landings <- landings_tidy %>% 
+  mutate(afs_name = str_remove(afs_name, pattern = "aggregate")) %>%  #Remove the word "aggregate"
+  filter(str_detect(afs_name, pattern = "salmon")) %>% #Filter for the word "salmon"
+  separate(afs_name, into = c("group","species"), sep = ",") #Separate names into group and species
+  
+
+```
+
+Salmon data exploration - find some grouped summary data
+(1) Find annual total US landings and dollar value (summing across all states) for each TYPE of salmon using 'group_by()' + 'summarize()'
+```{r}
+salmon_summary <- salmon_landings %>% 
+  group_by(year, species) %>% 
+  summarize(
+    tot_landings = sum(landings_pounds), 
+    tot_value = sum(dollars_usd)
+  )
+```
+
+(2) Make a graph
+```{r}
+salmon_landings_graph <- ggplot(data = salmon_summary, 
+                                aes(x = year, y = tot_landings)) +
+  geom_line(aes(color = species))
+salmon_landings_graph
+```
+
+(3) Export the graph with ggsave
+```{r}
+ggsave(plot = salmon_landings_graph, here("figures", "us_salmon_tj.png"),
+       height = 5,
+       width = 8) #Export salmons_landings_graph to the figures folder
+```
+
+(4) Make a kable table
+```{r}
+salmon_first_5 <- salmon_summary %>% 
+  table()
+  #not finished look at allison's code....
+
+kable(salmon_first_5) %>% 
+  kable_styling(bootstrap_options = "striped",
+                full_width = FALSE)
+```
+
+
